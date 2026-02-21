@@ -18,7 +18,8 @@ jobs:
           host: ${{ secrets.EC2_PUBLIC_IP }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "index.html"
+          # "*" നൽകുന്നതിലൂടെ html, css, images എല്ലാം സെർവറിൽ എത്തും
+          source: "index.html,styles.css,*.jpg,*.png" 
           target: "/home/ubuntu/"
 
       - name: Move to Web Folder
@@ -28,5 +29,11 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo mv /home/ubuntu/index.html /var/www/html/index.html
+            # എല്ലാ ഫയലുകളെയും വെബ് ഫോൾഡറിലേക്ക് മാറ്റുന്നു
+            sudo cp /home/ubuntu/index.html /var/www/html/
+            sudo cp /home/ubuntu/styles.css /var/www/html/
+            # ഇമേജുകൾ ഉണ്ടെങ്കിൽ അവയും മാറ്റാൻ താഴെ പറയുന്ന വരി സഹായിക്കും
+            sudo cp /home/ubuntu/*.jpg /var/www/html/ 2>/dev/null || true
+            sudo cp /home/ubuntu/*.png /var/www/html/ 2>/dev/null || true
+            
             sudo systemctl restart nginx
