@@ -82,3 +82,16 @@ resource "aws_route_table_association" "dev_rta" {
   subnet_id      = aws_subnet.dev_subnet.id
   route_table_id = aws_route_table.dev_rt.id
 }
+# 3. create s3 bucket
+resource "aws_s3_bucket" "terraform_state" {
+  bucket = "alaison-terraform-state-bucket" # ഈ പേര് യൂണീക്ക് ആയിരിക്കണം
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_versioning" "enabled" {
+  bucket = aws_s3_bucket.terraform_state.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
