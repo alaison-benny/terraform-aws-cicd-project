@@ -96,11 +96,4 @@ resource "aws_s3_bucket_versioning" "enabled" {
     status = "Enabled"
   }
 }
-terraform {
-  backend "s3" {
-    bucket         = "alaison-terraform-state-bucket" # മുകളിൽ നൽകിയ അതേ പേര്
-    key            = "dev/terraform.tfstate"
-    region         = "us-east-2" # നിങ്ങളുടെ റീജിയൻ
-    encrypt        = true
-  }
-}
+
