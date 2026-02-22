@@ -31,7 +31,9 @@ resource "aws_instance" "web_server" {
   instance_type = var.instance_type
   subnet_id     = aws_subnet.dev_subnet.id
   vpc_security_group_ids = [aws_security_group.dev_sg.id]
-
+  # ഡീറ്റെയിൽഡ് മോണിറ്ററിംഗ് എനേബിൾ ചെയ്യുന്നു
+  monitoring = true
+  
   tags = {
     Name = "DevOps-Server"
   }
