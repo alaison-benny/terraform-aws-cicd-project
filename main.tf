@@ -98,7 +98,8 @@ resource "aws_lb" "web_alb" {
 }
 
 resource "aws_lb_target_group" "tg" {
-  name     = "web-tg-v2" # പുതിയ പേര് നൽകുന്നത് നല്ലതാണ്
+  # പൈപ്പ്‌ലൈൻ എറർ ഒഴിവാക്കാൻ പഴയ പേര് തന്നെ നൽകുന്നു
+  name     = "web-target-group" 
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.day3_vpc.id
@@ -117,9 +118,8 @@ resource "aws_lb_listener" "front_end" {
   }
 }
 
-# --- Launch Template (With User Data Fix) ---
+# --- Launch Template ---
 resource "aws_launch_template" "web_config" {
-  # ഓരോ തവണ മാറ്റം വരുമ്പോഴും പുതിയ ടെംപ്ലേറ്റ് ഉണ്ടാക്കാൻ ഇത് സഹായിക്കും
   name_prefix   = "luxury-cars-template-" 
   image_id      = "ami-09040d770ffe2224f"
   instance_type = "t3.micro"
@@ -134,17 +134,17 @@ resource "aws_launch_template" "web_config" {
               sudo apt-get update -y
               sudo apt-get install -y nginx git
               
-              # ക്ലീൻ അപ്പ്
+              # നിലവിലുള്ള ഫയലുകൾ നീക്കം ചെയ്യുന്നു
               sudo rm -rf /var/www/html/*
               sudo rm -rf /tmp/website_temp
 
-              # പുതിയ കോഡ് ക്ലോൺ ചെയ്യുന്നു
+              # പുതിയ കോഡ് ഗിറ്റ്ഹബ്ബിൽ നിന്ന് എടുക്കുന്നു
               git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website_temp
               
-              # എല്ലാ ഫയലുകളും മൂവ് ചെയ്യുന്നു
+              # എല്ലാ ഫയലുകളും Nginx ഫോൾഡറിലേക്ക് കോപ്പി ചെയ്യുന്നു
               sudo cp -r /tmp/website_temp/* /var/www/html/
 
-              # പെർമിഷൻ ശരിയാക്കുന്നു
+              # പെർമിഷൻ ശരിയാക്കുന്നു (ഇമേജുകൾ കാണാൻ ഇത് പ്രധാനമാണ്)
               sudo chmod -R 755 /var/www/html/
               sudo chown -R www-data:www-data /var/www/html/
 
@@ -152,42 +152,3 @@ resource "aws_launch_template" "web_config" {
               sudo systemctl enable nginx
               EOF
   )
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# --- Auto Scaling Group (Automated Refresh Enabled) ---
-resource "aws_autoscaling_group" "web_asg" {
-  name                = "luxury-cars-asg"
-  vpc_zone_identifier = [aws_subnet.sub1.id, aws_subnet.sub2.id]
-  desired_capacity    = 2
-  max_size            = 3
-  min_size            = 1
-
-  launch_template {
-    id      = aws_launch_template.web_config.id
-    version = "$Latest" # ഏറ്റവും പുതിയ വേർഷൻ എടുക്കാൻ നിർബന്ധിക്കുന്നു
-  }
-
-  target_group_arns = [aws_lb_target_group.tg.arn]
-
-  # --- സ്വയം സെർവറുകൾ മാറ്റാനുള്ള ബ്ലോക്ക് ---
-  instance_refresh {
-    strategy = "Rolling"
-    preferences {
-      min_healthy_percentage = 50
-    }
-  }
-
-  tag {
-    key                 = "Name"
-    value               = "Luxury-Car-Server"
-    propagate_at_launch = true
-  }
-}
-
-output "alb_dns_name" {
-  value = aws_lb.web_alb.dns_name
-}
