@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 5.0" # പുതിയ വേർഷൻ നിർബന്ധമാക്കുന്നു
+      version = ">= 5.0"
     }
   }
 }
@@ -11,7 +11,7 @@ provider "aws" {
   region = "us-east-2"
 }
 
-# --- ബാക്കെൻഡ് റിസോഴ്സുകൾ (ഇത് ഒഴിവാക്കരുത്) ---
+# --- ബാക്കെൻഡ് റിസോഴ്സുകൾ ---
 resource "aws_s3_bucket" "terraform_state" {
   bucket        = "alaison-terraform-state-2026"
   force_destroy = false
@@ -116,48 +116,69 @@ resource "aws_lb_listener" "front_end" {
   }
 }
 
-# --- Launch Template & Auto Scaling ---
+# --- Launch Template ---
 resource "aws_launch_template" "web_config" {
-  name_prefix   = "web-server-template"
+  name_prefix   = "web-server-template-"
   image_id      = "ami-09040d770ffe2224f"
   instance_type = "t3.micro"
+  
   network_interfaces {
     associate_public_ip_address = true
     security_groups             = [aws_security_group.alb_sg.id]
   }
+
   user_data = base64encode(<<-EOF
               #!/bin/bash
               sudo apt-get update -y
               sudo apt-get install -y nginx git
               
-              # പഴയ ഫയലുകൾ നീക്കം ചെയ്യുന്നു
               sudo rm -rf /var/www/html/*
+              git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website_temp
+              sudo cp -r /tmp/website_temp/* /var/www/html/
 
-              # പ്രോജക്ട് ക്ലോൺ ചെയ്യുന്നു
-              git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website
-              
-              # എല്ലാ ഫയലുകളും (HTML, CSS, Images) ഒറ്റയടിക്ക് കോപ്പി ചെയ്യുന്നു
-              sudo cp -r /tmp/website/* /var/www/html/
-
-              # എല്ലാവർക്കും വായനാനുമതി നൽകുന്നു (ഇമേജ് ലോഡ് ആകാൻ ഇത് അത്യാവശ്യമാണ്)
               sudo chmod -R 755 /var/www/html/
               sudo chown -R www-data:www-data /var/www/html/
 
               sudo systemctl restart nginx
+              sudo systemctl enable nginx
               EOF
   )
+
+  # പുതിയ കോഡ് പുഷ് ചെയ്യുമ്പോൾ പുതിയൊരു വേർഷൻ ഉണ്ടാക്കാൻ ഇത് ആവശ്യമാണ്
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
+# --- Auto Scaling Group with Automated Instance Refresh ---
 resource "aws_autoscaling_group" "web_asg" {
+  name                = "web-asg-automated"
   vpc_zone_identifier = [aws_subnet.sub1.id, aws_subnet.sub2.id]
   desired_capacity    = 2
   max_size            = 3
   min_size            = 1
+
   launch_template {
     id      = aws_launch_template.web_config.id
-    version = "$Latest"
+    version = aws_launch_template.web_config.latest_version
   }
+
   target_group_arns = [aws_lb_target_group.tg.arn]
+
+  # --- സ്വയം ഇൻസ്റ്റൻസുകൾ മാറ്റാനുള്ള മാജിക് വരികൾ ---
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 50 # പകുതി സെർവറുകൾ എപ്പോഴും ഓടിക്കൊണ്ടിരിക്കും
+    }
+  }
+
+  # മാറ്റങ്ങൾ ട്രാക്ക് ചെയ്യാൻ ടാഗുകൾ ചേർക്കുന്നു
+  tag {
+    key                 = "Name"
+    value               = "Luxury-Car-Server"
+    propagate_at_launch = true
+  }
 }
 
 output "alb_dns_name" {
