@@ -128,12 +128,20 @@ resource "aws_launch_template" "web_config" {
   user_data = base64encode(<<-EOF
               #!/bin/bash
               sudo apt-get update -y
-              sudo apt-get install -y nginx
-              echo "<html><body style='background-color:#1a1a1a; color:white; text-align:center;'>
-                    <h1>Alaison's AI Portfolio</h1>
-                    <div style='color:#00ff00;'>Deployment via GitHub Actions: SUCCESSFUL</div>
-                    </body></html>" > /var/www/html/index.html
-              sudo systemctl start nginx
+              sudo apt-get install -y nginx git
+
+              # പഴയ ഫയലുകൾ മാറ്റുന്നു
+              sudo rm -rf /var/www/html/*
+
+              # നിങ്ങളുടെ ഗിറ്റഹബ്ബ് റിപ്പോസിറ്ററിയിൽ നിന്ന് ഫയലുകൾ ക്ലോൺ ചെയ്യുന്നു
+              git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website
+              
+              # ഫയലുകൾ ശരിയായ സ്ഥലത്തേക്ക് മാറ്റുന്നു
+              sudo cp -r /tmp/website/index.html /var/www/html/
+              sudo cp -r /tmp/website/styles.css /var/www/html/
+              sudo cp -r /tmp/website/profile.jpg /var/www/html/ # ചിത്രത്തിന്റെ പേര് ശ്രദ്ധിക്കുക
+
+              sudo systemctl restart nginx
               EOF
   )
 }
