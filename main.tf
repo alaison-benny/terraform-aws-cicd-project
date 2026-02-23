@@ -98,7 +98,6 @@ resource "aws_lb" "web_alb" {
 }
 
 resource "aws_lb_target_group" "tg" {
-  # പൈപ്പ്‌ലൈൻ എറർ ഒഴിവാക്കാൻ പഴയ പേര് തന്നെ നൽകുന്നു
   name     = "web-target-group" 
   port     = 80
   protocol = "HTTP"
@@ -134,21 +133,16 @@ resource "aws_launch_template" "web_config" {
               sudo apt-get update -y
               sudo apt-get install -y nginx git
               
-              # നിലവിലുള്ള ഫയലുകൾ നീക്കം ചെയ്യുന്നു
               sudo rm -rf /var/www/html/*
               sudo rm -rf /tmp/website_temp
 
-              # പുതിയ കോഡ് ഗിറ്റ്ഹബ്ബിൽ നിന്ന് എടുക്കുന്നു
               git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website_temp
               
-              # എല്ലാ ഫയലുകളും Nginx ഫോൾഡറിലേക്ക് കോപ്പി ചെയ്യുന്നു
               sudo cp -r /tmp/website_temp/* /var/www/html/
 
-              # പെർമിഷൻ ശരിയാക്കുന്നു (ഇമേജുകൾ കാണാൻ ഇത് പ്രധാനമാണ്)
               sudo chmod -R 755 /var/www/html/
               sudo chown -R www-data:www-data /var/www/html/
 
               sudo systemctl restart nginx
               sudo systemctl enable nginx
               EOF
-  )
