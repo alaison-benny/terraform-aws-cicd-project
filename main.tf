@@ -128,21 +128,55 @@ resource "aws_launch_template" "web_config" {
     security_groups             = [aws_security_group.alb_sg.id]
   }
 
-  user_data = base64encode(<<-EOF
-              #!/bin/bash
-              sudo apt-get update -y
-              sudo apt-get install -y nginx git
-              
-              sudo rm -rf /var/www/html/*
-              sudo rm -rf /tmp/website_temp
+  user_data = base64encode(<<EOF
+#!/bin/bash
+sudo apt-get update -y
+sudo apt-get install -y nginx git
+sudo rm -rf /var/www/html/*
+sudo rm -rf /tmp/website_temp
+git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website_temp
+sudo cp -r /tmp/website_temp/* /var/www/html/
+sudo chmod -R 755 /var/www/html/
+sudo chown -R www-data:www-data /var/www/html/
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+EOF
+  )
 
-              git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website_temp
-              
-              sudo cp -r /tmp/website_temp/* /var/www/html/
+  lifecycle {
+    create_before_destroy = true
+  }
+}
 
-              sudo chmod -R 755 /var/www/html/
-              sudo chown -R www-data:www-data /var/www/html/
+# --- Auto Scaling Group ---
+resource "aws_autoscaling_group" "web_asg" {
+  name                = "web-asg-automated"
+  vpc_zone_identifier = [aws_subnet.sub1.id, aws_subnet.sub2.id]
+  desired_capacity    = 2
+  max_size            = 3
+  min_size            = 1
 
-              sudo systemctl restart nginx
-              sudo systemctl enable nginx
-              EOF
+  launch_template {
+    id      = aws_launch_template.web_config.id
+    version = "$Latest" 
+  }
+
+  target_group_arns = [aws_lb_target_group.tg.arn]
+
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 50
+    }
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "Luxury-Car-Server"
+    propagate_at_launch = true
+  }
+}
+
+output "alb_dns_name" {
+  value = aws_lb.web_alb.dns_name
+}
