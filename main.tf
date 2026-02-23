@@ -129,15 +129,19 @@ resource "aws_launch_template" "web_config" {
               #!/bin/bash
               sudo apt-get update -y
               sudo apt-get install -y nginx git
+              
+              # പഴയ ഫയലുകൾ നീക്കം ചെയ്യുന്നു
               sudo rm -rf /var/www/html/*
+
+              # പ്രോജക്ട് ക്ലോൺ ചെയ്യുന്നു
               git clone https://github.com/alaison-benny/terraform-aws-cicd-project.git /tmp/website
               
-              # ഫയലുകൾ കൃത്യമായ പേരിൽ കോപ്പി ചെയ്യുന്നു
-              sudo cp /tmp/website/index.html /var/www/html/
-              sudo cp /tmp/website/styles.css /var/www/html/
-              sudo cp /tmp/website/image_c6c439.png /var/www/html/
-              sudo cp /tmp/website/image_c6c6e5.png /var/www/html/
-              sudo cp /tmp/website/image_c6c705.png /var/www/html/
+              # എല്ലാ ഫയലുകളും (HTML, CSS, Images) ഒറ്റയടിക്ക് കോപ്പി ചെയ്യുന്നു
+              sudo cp -r /tmp/website/* /var/www/html/
+
+              # എല്ലാവർക്കും വായനാനുമതി നൽകുന്നു (ഇമേജ് ലോഡ് ആകാൻ ഇത് അത്യാവശ്യമാണ്)
+              sudo chmod -R 755 /var/www/html/
+              sudo chown -R www-data:www-data /var/www/html/
 
               sudo systemctl restart nginx
               EOF
