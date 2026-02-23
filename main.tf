@@ -2,17 +2,32 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = ">= 5.0" # പുതിയ വേർഷൻ നിർബന്ധമാക്കുന്നു
     }
   }
 }
 
 provider "aws" {
-  region = "us-east-2" # നിങ്ങളുടെ റീജിയൻ ഇവിടെ നൽകുക
+  region = "us-east-2"
 }
-# --- Day 4: High Availability & CI/CD Portfolio Deployment ---
 
-# 1. VPC & Networking
+# --- ബാക്കെൻഡ് റിസോഴ്സുകൾ (ഇത് ഒഴിവാക്കരുത്) ---
+resource "aws_s3_bucket" "terraform_state" {
+  bucket        = "alaison-terraform-state-2026"
+  force_destroy = false
+}
+
+resource "aws_dynamodb_table" "terraform_locks" {
+  name         = "terraform-state-locking"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
+  attribute {
+    name = "LockID"
+    type = "S"
+  }
+}
+
+# --- VPC & Networking ---
 resource "aws_vpc" "day3_vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -24,7 +39,6 @@ resource "aws_subnet" "sub1" {
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-2a"
   map_public_ip_on_launch = true
-  tags = { Name = "Subnet-2a" }
 }
 
 resource "aws_subnet" "sub2" {
@@ -32,12 +46,10 @@ resource "aws_subnet" "sub2" {
   cidr_block              = "10.0.2.0/24"
   availability_zone       = "us-east-2b"
   map_public_ip_on_launch = true
-  tags = { Name = "Subnet-2b" }
 }
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.day3_vpc.id
-  tags   = { Name = "Day3-IGW" }
 }
 
 resource "aws_route_table" "rt" {
@@ -58,18 +70,16 @@ resource "aws_route_table_association" "a2" {
   route_table_id = aws_route_table.rt.id
 }
 
-# 2. Security Groups
+# --- Security & Load Balancer ---
 resource "aws_security_group" "alb_sg" {
   name   = "alb-sg"
   vpc_id = aws_vpc.day3_vpc.id
-
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -78,7 +88,6 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# 3. Load Balancer Configuration
 resource "aws_lb" "web_alb" {
   name               = "web-alb"
   internal           = false
@@ -92,10 +101,8 @@ resource "aws_lb_target_group" "tg" {
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.day3_vpc.id
-
   health_check {
     path = "/"
-    port = "traffic-port"
   }
 }
 
@@ -103,64 +110,46 @@ resource "aws_lb_listener" "front_end" {
   load_balancer_arn = aws_lb.web_alb.arn
   port              = "80"
   protocol          = "HTTP"
-
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.tg.arn
   }
 }
 
-# 4. Launch Template with AI Portfolio User Data
+# --- Launch Template & Auto Scaling ---
 resource "aws_launch_template" "web_config" {
   name_prefix   = "web-server-template"
-  image_id      = "ami-09040d770ffe2224f" 
+  image_id      = "ami-09040d770ffe2224f"
   instance_type = "t3.micro"
-
   network_interfaces {
     associate_public_ip_address = true
     security_groups             = [aws_security_group.alb_sg.id]
   }
-
   user_data = base64encode(<<-EOF
               #!/bin/bash
               sudo apt-get update -y
-              sudo apt-get install -y nginx git
-              sudo rm -rf /var/www/html/*
-              echo "<html><body style='background-color:#1a1a1a; color:white; text-align:center; padding-top:50px; font-family:sans-serif;'>
-                    <h1 style='color:#007bff;'>Alaison's AI Portfolio</h1>
-                    <p>Compliance-Led AI Cloud Engineer In Training</p>
-                    <hr style='width:50%; border:0.5px solid #333;'>
-                    <div style='color:#00ff00; font-weight:bold;'>Deployment via GitHub Actions: SUCCESSFUL</div>
-                    <p style='font-size: small; color: #888;'>Auto-scaled & Load-balanced Infrastructure</p>
+              sudo apt-get install -y nginx
+              echo "<html><body style='background-color:#1a1a1a; color:white; text-align:center;'>
+                    <h1>Alaison's AI Portfolio</h1>
+                    <div style='color:#00ff00;'>Deployment via GitHub Actions: SUCCESSFUL</div>
                     </body></html>" > /var/www/html/index.html
               sudo systemctl start nginx
-              sudo systemctl enable nginx
               EOF
   )
 }
 
-# 5. Auto Scaling Group
 resource "aws_autoscaling_group" "web_asg" {
   vpc_zone_identifier = [aws_subnet.sub1.id, aws_subnet.sub2.id]
   desired_capacity    = 2
   max_size            = 3
   min_size            = 1
-
   launch_template {
     id      = aws_launch_template.web_config.id
     version = "$Latest"
   }
-
   target_group_arns = [aws_lb_target_group.tg.arn]
-
-  tag {
-    key                 = "Name"
-    value               = "ASG-Web-Server"
-    propagate_at_launch = true
-  }
 }
 
-# 6. Outputs
 output "alb_dns_name" {
   value = aws_lb.web_alb.dns_name
 }
