@@ -1,3 +1,15 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "us-east-2" # നിങ്ങളുടെ റീജിയൻ ഇവിടെ നൽകുക
+}
 # --- Day 4: High Availability & CI/CD Portfolio Deployment ---
 
 # 1. VPC & Networking
