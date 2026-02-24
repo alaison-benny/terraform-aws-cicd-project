@@ -188,3 +188,33 @@ resource "aws_autoscaling_group" "web_asg" {
 output "alb_dns_name" {
   value = aws_lb.web_alb.dns_name
 }
+# 1. SNS Topic നിർമ്മിക്കുന്നു
+resource "aws_sns_topic" "user_updates" {
+  name = "infrastructure-updates"
+}
+
+# 2. ഇമെയിൽ സബ്സ്ക്രിപ്ഷൻ (നിങ്ങളുടെ ഇമെയിൽ ഇവിടെ നൽകുക)
+resource "aws_sns_topic_subscription" "user_updates_sqs_target" {
+  topic_arn = aws_sns_topic.user_updates.arn
+  protocol  = "email"
+  endpoint  = "alaisonbennyonline@gmail.com" # <--- ഇവിടെ നിങ്ങളുടെ ഇമെയിൽ നൽകുക
+}
+
+# 3. CloudWatch Alarm (ASG ഇൻസ്റ്റൻസ് മാറ്റങ്ങൾ നിരീക്ഷിക്കാൻ)
+resource "aws_cloudwatch_metric_alarm" "asg_health_alarm" {
+  alarm_name          = "asg-health-alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "GroupDesiredCapacity"
+  namespace           = "AWS/AutoScaling"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "2" # 2-ൽ കൂടുതൽ ഇൻസ്റ്റൻസ് വന്നാൽ അലാറം അടിക്കും
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.web_asg.name
+  }
+
+  alarm_description = "This metric monitors ASG desired capacity"
+  alarm_actions     = [aws_sns_topic.user_updates.arn]
+}
