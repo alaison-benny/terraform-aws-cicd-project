@@ -106,7 +106,7 @@ resource "aws_lb" "web_alb" {
 }
 
 resource "aws_lb_target_group" "tg" {
-  name     = "web-target-group" 
+  name     = "web-tg-new"  # പേര് മാറ്റുക
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.day3_vpc.id
