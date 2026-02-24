@@ -193,7 +193,7 @@ resource "aws_sns_topic" "user_updates" {
   name = "infrastructure-updates"
 }
 
-# 2. ഇമെയിൽ സബ്സ്ക്രിപ്ഷൻ (നിങ്ങളുടെ ഇമെയിൽ ഇവിടെ നൽകുക)
+# 2. ഇമെയിൽ സബ്സ്ക്രിപ്ഷൻ (നിങ്ങളുടെ ഇമെയിൽ ഇവിടെ നൽകുക)ok
 resource "aws_sns_topic_subscription" "user_updates_sqs_target" {
   topic_arn = aws_sns_topic.user_updates.arn
   protocol  = "email"
